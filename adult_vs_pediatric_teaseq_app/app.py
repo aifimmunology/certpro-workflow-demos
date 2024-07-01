@@ -949,7 +949,7 @@ def expr_hm(expr_df, gene):
         z = mat_es, 
         y = mat_es.index, 
         x = mat_es.columns, 
-        colorscale='RdBu_r',
+        colorscale='aggrnyl',
         name = 'Pseudobulk expression of {g}'.format(g = gene))
 
     fig.append_trace(

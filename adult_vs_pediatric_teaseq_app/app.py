@@ -16,6 +16,7 @@ import plotly.subplots
 import dash_daq as daq # import needed, for numeric input
 import plotly
 
+import h5py
 import pickle
 
 import math
@@ -88,6 +89,53 @@ logging.basicConfig(level=logging.INFO)
 
 
 ## Functions
+
+## Read sample metadata from the pseudobulk .h5 file
+def read_obs(h5con):
+    bc = h5con['obs']['barcodes'][:]
+    bc = [x.decode('UTF-8') for x in bc]
+
+    # Initialized the DataFrame with cell barcodes
+    obs_df = pd.DataFrame({'barcodes' : bc })
+
+    # Get the list of available metadata columns
+    obs_columns = h5con['obs'].keys()
+
+    # For each column
+    for col in obs_columns:
+        # Read the values
+        values = h5con['obs'][col][:]
+        # Check for byte storage
+        if(isinstance(values[0], (bytes, bytearray))):
+            # Decode byte strings
+            values = [x.decode('UTF-8') for x in values]
+        # Add column to the DataFrame
+        obs_df[col] = values
+
+    obs_df = obs_df.set_index('barcodes', drop = True)
+    
+    return obs_df
+
+## Read list of available genes in pseudobulk .h5 file
+def read_genes(h5con):
+    genes = h5con['var']['genes'][:]
+    genes = [x.decode('UTF-8') for x in genes]
+
+    return genes
+
+## Read and add data for a selected gene
+def read_expr(h5con, meta, gene, all_genes = None):
+    if all_genes is None:
+        all_genes = read_genes(h5con)
+    
+    gene_idx = all_genes.index(gene)
+
+    expr = h5con['data'][:,gene_idx]
+
+    meta[gene] = expr
+
+    return meta
+
 
 ### volcano
 
@@ -881,6 +929,38 @@ def map_p_binary(pvals, alpha=0.05, type_dict = {'s':1,'ns':-1, 'other':0}):
 # map_p_binary(mynum, type_dict = pdict_sym)
 
 
+def expr_hm(expr_df, gene):
+
+    expr_df['type_label'] = [ct_dict[x] for x in expr_df['aifi_cell_type']]
+
+    mat_es = expr_df.copy().pivot(index='type_label', columns='subject.subjectGuid', values = gene)
+
+    subject_order = mat_es.columns.to_list()
+    subject_order.sort(reverse = True)
+
+    mat_es = mat_es.loc[ct_y_order,subject_order]
+
+    fig = plotly.subplots.make_subplots(
+            rows=1, 
+            cols=1
+        )
+
+    dat_hm = go.Heatmap(
+        z = mat_es, 
+        y = mat_es.index, 
+        x = mat_es.columns, 
+        colorscale='RdBu_r',
+        name = 'Pseudobulk expression of {g}'.format(g = gene))
+
+    fig.append_trace(
+        dat_hm,
+        row=1,
+        col=1
+    )
+
+    return(fig)
+
+
 def differential_hm(df, 
                     y_col = 'gene',
                     obs_col = 'obs', 
@@ -920,9 +1000,11 @@ def differential_hm(df,
     
     # Filter data (metadata or features okay)
     df_fmt = df_raw.copy()
-    for key in filter_dict:
-        df_fmt = df_fmt.loc[df_fmt[key].isin(filter_dict[key])]
-    # keep_feat = df_fmt[feat_col].values.unique().copy().tolist()
+
+    if filter_dict:
+        for key in filter_dict:
+            df_fmt = df_fmt.loc[df_fmt[key].isin(filter_dict[key])]
+        # keep_feat = df_fmt[feat_col].values.unique().copy().tolist()
     
     # # Fill in features selected if not in data
     # if(drop_missing == False):
@@ -958,19 +1040,22 @@ def differential_hm(df,
         print(meta[obs_col].values)   
         print('column order: ')
         print(meta_plot_order)
-            
+    
     # convert es values to matrix
     mat_es = df_fmt.copy().pivot(index=y_col, columns=obs_col, values = es_col)
     
-    # pvalue recoded matrices
-    pdict_sym = {'s':"*",'ns':"", 'other':""}
-    pdict_num = {'s':1,'ns':-1, 'other':0}
+    if signif_col:
+        # pvalue recoded matrices
+        pdict_sym = {'s':"*",'ns':"", 'other':""}
+        pdict_num = {'s':1,'ns':-1, 'other':0}
+        
+        mat_signif = df_fmt.copy().pivot(index=y_col, columns=obs_col, values = signif_col)
+        
+        mat_signif_text = mat_signif.copy().apply(lambda x: map_p_binary(x, alpha = signif_cutoff, type_dict = pdict_sym), axis = 1, result_type='expand')
+        mat_signif_text = mat_signif_text.rename(columns={i:mat_signif.columns[i] for i in range(mat_signif.shape[1])}, errors="raise")
+    else:
+        mat_signif_text = None
     
-    mat_signif = df_fmt.copy().pivot(index=y_col, columns=obs_col, values = signif_col)
-    
-    mat_signif_text = mat_signif.copy().apply(lambda x: map_p_binary(x, alpha = signif_cutoff, type_dict = pdict_sym), axis = 1, result_type='expand')
-    mat_signif_text = mat_signif_text.rename(columns={i:mat_signif.columns[i] for i in range(mat_signif.shape[1])}, errors="raise")
-
     # order columns of matrixes
     if cluster_cols:
         if verbose:
@@ -980,12 +1065,14 @@ def differential_hm(df,
         imeta = python_match(orderedvals=col_clorder_index, values=meta[obs_col].values.tolist())
         meta = meta.iloc[imeta,]
         meta = meta.reset_index(drop=True)
-        mat_signif_text = mat_signif_text.loc[:, col_clorder_index]
-        mat_signif = mat_signif.loc[:, col_clorder_index]
+        if signif_col:
+            mat_signif_text = mat_signif_text.loc[:, col_clorder_index]
+            mat_signif = mat_signif.loc[:, col_clorder_index]
         mat_es = mat_es.loc[:, col_clorder_index]
     else:
-        mat_signif = mat_signif.loc[:, meta[obs_col].values.tolist()]
-        mat_signif_text = mat_signif_text.loc[:, meta[obs_col].values.tolist()]  # need tolist() to get strings instead of categories.
+        if signif_col:
+            mat_signif = mat_signif.loc[:, meta[obs_col].values.tolist()]
+            mat_signif_text = mat_signif_text.loc[:, meta[obs_col].values.tolist()]  # need tolist() to get strings instead of categories.
         mat_es = mat_es.loc[:, meta[obs_col].values.tolist()]
     if check:
         print("pval matrix after column ordering")
@@ -998,27 +1085,33 @@ def differential_hm(df,
             print("clustering rows")
             print("Matrix shape: {}".format(mat.shape))
         row_clorder_index = cluster_matrix(mat_es, index = 0, fill_na = 0, value_return='index')
-        mat_signif = mat_signif.loc[row_clorder_index, :]
-        mat_signif_text = mat_signif_text.loc[row_clorder_index, :]
+        if signif_col:
+            mat_signif = mat_signif.loc[row_clorder_index, :]
+            mat_signif_text = mat_signif_text.loc[row_clorder_index, :]
         mat_es = mat_es.loc[row_clorder_index, :]
     elif reverse_rows:
         if verbose:
             print("reversing rows")
             print("Matrix shape: {}".format(mat.shape))
-        mat_signif = mat_signif.loc[::-1]
-        mat_signif_text = mat_signif_text.loc[::-1]
+        if signif_col:
+            mat_signif = mat_signif.loc[::-1]
+            mat_signif_text = mat_signif_text.loc[::-1]
         mat_es = mat_es.loc[::-1]
         
     if check:
         print("pval matrix after row ordering")
-        print(mat_signif)
+        if signif_col:
+            print(mat_signif)
         print(meta[obs_col].values)
     
     # Construct Plot
     
     # hover pattern
-    hover_text_mat = obs_col +': %{x}<br>'+                     y_col +': %{y}<br>'+                     es_col +': %{z:.3f}<br>'+                     signif_col+': %{customdata:.3f}<br>'+                     'significance: %{text}<br>'
-    
+    if signif_col:
+        hover_text_mat = obs_col +': %{x}<br>'+                     y_col +': %{y}<br>'+                     es_col +': %{z:.3f}<br>'+                     signif_col+': %{customdata:.3f}<br>'+                     'significance: %{text}<br>'
+    else:
+        hover_text_mat = obs_col +': %{x}<br>'+                     y_col +': %{y}<br>'+                     es_col +': %{z:.3f}<br>'
+
     # plot
     if meta_plot is not None: # metadata annotations
         # initialize a subplot matrix
@@ -1030,7 +1123,7 @@ def differential_hm(df,
             row_heights = rheights, 
             vertical_spacing = 0.01,
             shared_xaxes=True
-        )   
+        )
 
         # Calculate subplot legend positions
         xloc, yloc = _calc_meta_legend_locs(
@@ -1075,6 +1168,7 @@ def differential_hm(df,
             x = xloc[len(meta_plot)],
             title = title,
         )
+
         dat_hm = go.Heatmap(
             z = mat_es, 
             y = mat_es.index, 
@@ -1279,30 +1373,45 @@ def reset_all_categorical(df):
 ## Data Prep-- Modify for new datasets
 
 ### Constants
-app_title = 'VRd In-Vitro T-cell DEGs'
+app_title = 'Pediatric vs. Older Adult T-cell DEGs'
 
 no_selection_instruction = 'Please make a gene selection to view gene information'
 
-hm_defaults = ['comparison','treatment']
+hm_defaults = ['cohort.cohortGuid']
 volcano_ct_default = 'CD4 Naive'
 # volcano_experiment_default = 'All Subjects'
-volcano_comparison_default = 'TEA-seq Dex. 4 hr'
+volcano_comparison_default = 'Older Adult vs Pediatric'
 
 debug = False
 
 
 ### DEG Results
-fp = './data/all_mast_deg_2023-09-06.pkl'
+fp = './data/all_mast_deg_2024-07-01.pkl'
 with open(fp, 'rb') as handle:
     df = pickle.load(handle)
 handle.close()
 
 feat = df.gene.unique().tolist()
 
+### Pseudobulk expression
+pb_h5 = h5py.File('data/ped_sr_tea_pseudobulk_mean_2024-07-01.h5')
+pb_meta = read_obs(pb_h5)
+pb_genes = read_genes(pb_h5)
+
 #### Format Categorical Data
 
 ct_order = ['CD4 Naive','CD4 CM','CD4 EM','CD4 Treg',
             'CD8 Naive', 'CD8 Memory']
+ct_y_order = ct_order
+ct_y_order.reverse()
+ct_dict = {
+    't_cd8_naive': 'CD8 Naive',
+    't_cd8_memory': 'CD8 Memory',
+    't_cd4_treg': 'CD4 Treg',
+    't_cd4_naive': 'CD4 Naive',
+    't_cd4_em': 'CD4 EM',
+    't_cd4_cm': 'CD4 CM'
+}
 expt_order = ['Older Adults & Pediatric T cell TEA-seq']
 comp_order = ['Older Adult vs Pediatric']
 
@@ -2198,28 +2307,32 @@ def update_heatmap(value, signif_cutoff, metaplot, metasort, cluster_col, cluste
         # reverse the celltype order for row plot
 
         if type(value)==str:
-            value = [value]            
-        fdict={'gene':value}
+            value = [value]
+        #fdict={'gene':value}
+        pb_df = read_expr(pb_h5, pb_meta, value[0])
 
-        fig = differential_hm(
-            df=df, 
-            filter_dict=fdict,
-            y_col = 'cell_type',
-            reverse_rows = True,
-            cluster_cols = cluster_col_b, 
-            cluster_rows = cluster_rows_b,
-            signif_cutoff = signif_cutoff,
-            signif_col = 'adjP', 
-            es_col = 'logFC', 
-            obs_col = 'comparison', 
-            meta_plot = metaplot,
-            meta_plot_order=meta_sort,
-            meta_colors=color_dict_plot,
-            fontsize = 12,
-            legend_font_size = 10,
-            legend_row_spacing = 0.005,
-            legend_column_spacing=0.4
-        )
+        fig = expr_hm(pb_df, value[0])
+
+        # fig = differential_hm(
+        #     df=pb_df, 
+        #     #filter_dict=fdict,
+        #     filter_dict = None,
+        #     y_col = 'aifi_cell_type',
+        #     reverse_rows = True,
+        #     cluster_cols = cluster_col_b, 
+        #     cluster_rows = cluster_rows_b,
+        #     signif_cutoff = signif_cutoff,
+        #     signif_col = None, 
+        #     es_col = value, 
+        #     obs_col = 'subject.subjectGuid', 
+        #     meta_plot = metaplot,
+        #     meta_plot_order=meta_sort,
+        #     meta_colors=color_dict_plot,
+        #     fontsize = 12,
+        #     legend_font_size = 10,
+        #     legend_row_spacing = 0.005,
+        #     legend_column_spacing=0.4
+        # )
         fig.update_layout(
             autosize = True,
             height = 500,
@@ -2277,3 +2390,5 @@ def update_info_panel(genes):
 if __name__ == '__main__':
     app.run_server(host='0.0.0.0',port=8050)
 
+
+# %%

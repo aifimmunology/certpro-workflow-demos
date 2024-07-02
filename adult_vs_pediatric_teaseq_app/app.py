@@ -4,7 +4,7 @@
 
 # # VRd In Vitro DEG Comparison
 
-app_version = '1.0.1'  #20230907
+app_version = '1.0.3'  #2024-07-01
 
 # Set Up
 from dash import dash, dcc, html, Input, Output, State, MATCH, ALL # dash_table
@@ -13,7 +13,7 @@ import plotly.express as px
 import plotly.io as pio
 import plotly.graph_objects as go
 import plotly.subplots
-import dash_daq as daq # import needed, for numeric input
+#import dash_daq as daq # import needed, for numeric input
 import plotly
 
 import h5py
@@ -23,7 +23,7 @@ import math
 import numpy as np
 import pandas as pd
 import re
-from sklearn.cluster import AgglomerativeClustering
+#from sklearn.cluster import AgglomerativeClustering
 
 # Gene info
 import mygene  # gene info
@@ -949,7 +949,7 @@ def expr_hm(expr_df, gene):
         z = mat_es, 
         y = mat_es.index, 
         x = mat_es.columns, 
-        colorscale='RdBu_r',
+        colorscale='aggrnyl',
         name = 'Pseudobulk expression of {g}'.format(g = gene))
 
     fig.append_trace(
@@ -1215,63 +1215,63 @@ def differential_hm(df,
     return(fig)
 
 
-def cluster_matrix(mat, index=0, fill_na = 0, value_return = 'order'):
-    '''
-    Cluster a matrix by row (index = 0) or column (index = 1) using hierarchical
-    clustering (sklearn AgglomerativeClustering). Return the sorted column order
-    as numeric locations (value_return = 'order'
+# def cluster_matrix(mat, index=0, fill_na = 0, value_return = 'order'):
+#     '''
+#     Cluster a matrix by row (index = 0) or column (index = 1) using hierarchical
+#     clustering (sklearn AgglomerativeClustering). Return the sorted column order
+#     as numeric locations (value_return = 'order'
      
-    Examples
-    --------
-    ncells = 100
-    nfeat = 10
-    meta_levels = {'group' : ['A','B','C'],
-                  'timepoint' : [1,2,3,4],
-                  'fruit' : ['apple','banana']
-                  }
-    meta = pd.DataFrame([])
-    for key in meta_levels:
-                meta[key] = pd.Series([random.sample(meta_levels[key], 1)[0] for i in range(ncells)], dtype="category")
-    meta['cell'] = ['cell_' + str(x) for x in range(ncells)]
-    mat = np.array([np.random.negative_binomial(2, 0.8, size=ncells)  for i in range(nfeat)])
+#     Examples
+#     --------
+#     ncells = 100
+#     nfeat = 10
+#     meta_levels = {'group' : ['A','B','C'],
+#                   'timepoint' : [1,2,3,4],
+#                   'fruit' : ['apple','banana']
+#                   }
+#     meta = pd.DataFrame([])
+#     for key in meta_levels:
+#                 meta[key] = pd.Series([random.sample(meta_levels[key], 1)[0] for i in range(ncells)], dtype="category")
+#     meta['cell'] = ['cell_' + str(x) for x in range(ncells)]
+#     mat = np.array([np.random.negative_binomial(2, 0.8, size=ncells)  for i in range(nfeat)])
 
-    feat = ["feat"+str(i+1) for i in range(nfeat)]
+#     feat = ["feat"+str(i+1) for i in range(nfeat)]
 
-    matdf = pd.DataFrame(mat)
-    matdf['feat'] = feat
-    matdf = matdf.set_index('feat')
+#     matdf = pd.DataFrame(mat)
+#     matdf['feat'] = feat
+#     matdf = matdf.set_index('feat')
     
-    irow = cluster_matrix(matdf)
-    matdf.iloc[irow,]
+#     irow = cluster_matrix(matdf)
+#     matdf.iloc[irow,]
     
-    icol = cluster_matrix(matdf, index = 1)
-    matdf.iloc[:,icol]
+#     icol = cluster_matrix(matdf, index = 1)
+#     matdf.iloc[:,icol]
     
-    '''
-    if index == 0:
-        mat_cl = mat.copy()
-    elif index == 1:
-        mat_cl = mat.transpose().copy()
-    else:
-        print("index should be 0 for clustering rows or 1 for clustering columns")
+#     '''
+#     if index == 0:
+#         mat_cl = mat.copy()
+#     elif index == 1:
+#         mat_cl = mat.transpose().copy()
+#     else:
+#         print("index should be 0 for clustering rows or 1 for clustering columns")
         
-    mat_cl = mat_cl.fillna(fill_na)
+#     mat_cl = mat_cl.fillna(fill_na)
     
-    cl_res_list = []
+#     cl_res_list = []
 
-    for i in range(mat_cl.shape[0]):
-        hclust_col = AgglomerativeClustering(n_clusters = i+1, affinity = 'euclidean', linkage='ward')
-        cname = 'itr'+str(i+1)
-        cl_res_list.append(pd.DataFrame({cname:hclust_col.fit_predict(mat_cl)}))
+#     for i in range(mat_cl.shape[0]):
+#         hclust_col = AgglomerativeClustering(n_clusters = i+1, affinity = 'euclidean', linkage='ward')
+#         cname = 'itr'+str(i+1)
+#         cl_res_list.append(pd.DataFrame({cname:hclust_col.fit_predict(mat_cl)}))
         
-    cl_res = pd.concat(cl_res_list, axis=1)
+#     cl_res = pd.concat(cl_res_list, axis=1)
         
-    dim_order = cl_res.sort_values(by = cl_res.columns.tolist()).index
+#     dim_order = cl_res.sort_values(by = cl_res.columns.tolist()).index
     
-    if value_return == 'order':
-        return(dim_order.tolist())
-    elif value_return == 'index':
-        return(mat_cl.index[dim_order].tolist())
+#     if value_return == 'order':
+#         return(dim_order.tolist())
+#     elif value_return == 'index':
+#         return(mat_cl.index[dim_order].tolist())
 
 
 ### Parsing

@@ -22,6 +22,8 @@ This analysis is performed in a single Jupyter Notebook:
 
 This demonstration is stored in the `adult_vs_pediatric_teaseq/` subdirectory. An interactive data visualization tool for differential gene expression is stored in the `dash_app/` subdirectory.
 
+### Analysis of TEA-seq data
+
 In this demo, we show a chain of analysis steps, in which each individual step is stored in HISE and used for subsequent analysis. The following steps are performed in the notebooks for this analysis:
 
 - `00-R_select_samples.ipynb`: Identification of files and associated sample metadata stored in HISE for downstream analysis steps.
@@ -51,6 +53,21 @@ In this demo, we show a chain of analysis steps, in which each individual step i
 - `08-R_assemble_pseudobulk_data.ipynb`: For visualization in a heatmap, this notebook was used to compute pseudobulk expression for each combination of sample and cell type.
     - Input: CD4 and CD8 T cell seurat objects; .csv files with CD4 and CD8 T cell labels
     - Output: .csv files with tables of pseudobulk expression; a .rds file containing lists of the same tables; and a .h5 file with the pseudobulk dataset formatted for fast retrieval by the visualization app.
+
+### Visualization App
+
+An interactive visualization app built on the Dash framework is available in the `adult_vs_pediatric_teaseq/dash_app/` directory.
+
+Following assembly of differential gene expression and pseudobulk expression data, we generated an interactive visualization tool that enables exploration of these results. The following files are used for assembly of related data and app deployment:
+
+- `01_GetHallmarkGenesetDescriptions.ipynb`: This notebook retrieves descriptions of Hallmark gene sets for display in the visualization app. Users are able to select Hallmark gene sets and highlight these genes in the volcano plot within the app.
+- `02_FormatAppDat_updated.ipynb`: This notebook retrieves the data stored in HISE that were generated using the notebooks above (steps `07` and `08`), and structures the data for use and deployment with the visualization tool.
+- `03_UploadVisualization.ipynb`: This notebook deploys the visualization tool to the Collaboration Space in HISE for our Certificate of Reproducibility demonstrations so that it can be connected to our public-facing HISE Publication.
+
+The following files are utilized by the app itself:
+- `app.py`: The main file containing code for the Dash visualization app.
+- `assets/`: Contains additional CSS styles for the app.
+- `data/`: This subdirectory contains files utilized by the app after deployment. Note that not all data is present in this repository - it must be retrieved and staged using the notebooks, above.
 
 # Legal Information
 

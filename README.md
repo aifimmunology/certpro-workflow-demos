@@ -2,18 +2,18 @@
 
 In this repository, demonstrations of data analysis utilizing Certificate of Reproducibility workflows are presented at multiple levels of complexity.
 
-## Simple example: Batch control comparison
+## Simple example: Leukopak/Ficoll comparison
 
 **Notebook author:** Lucas T. Graybuck
 
-This demonstration is stored in the `batch_control_comparison/` subdirectory.
+This demonstration is stored in the `leukopak_pbmc_comparison/` subdirectory.
 
-In this demo, we show a single analysis step downstream of data generated using our scRNA-seq data processing pipeline. Here, we retrieve batch control scRNA-seq data from two batches, combine the data, and perform dimensionality reduction and a simple differential expression test between samples in the two batches.
+In this demo, we show a single analysis step downstream of data generated using our TEA-seq data processing pipeline. Here, we retrieve leukapheresis-derived batch control scRNA-seq data and data from a Ficoll PBMC sample, combine the data, and perform dimensionality reduction and a simple differential expression test between samples.
 
 After performing this analysis, we assemble output files and deposit the results in HISE for storage of results, capture of the analysis environment, and later assembly of the results as a File Set that can be accessed by external users.
 
 This analysis is performed in a single Jupyter Notebook:  
-`batch_control_comparison/analyze_bioivt_data.ipynb`
+`leukopak_pbmc_comparison/compare_leukopak_pbmc_sample.ipynb`
 
 ## Multi-step example: Comparison of Pediatric and Adult TEA-seq data
 
